@@ -1,0 +1,321 @@
+﻿@using BlazorTemplateDoc.Shared.Resources
+@using Syncfusion.EJ2.Blazor
+@using Syncfusion.EJ2.Blazor.Popups
+@using Syncfusion.EJ2.Blazor.Buttons
+@using Syncfusion.EJ2.Blazor.DropDowns
+@page "/templateedit/{id:int}"
+@inject HttpClient Http
+@inject NavigationManager UriHelper
+
+<h5>Template Details and Actions</h5>
+<NavLink href="templates">Back to List</NavLink>
+<br />
+@if (DetailsBool == true)
+{
+
+    <button class="btn btn-warning m-2" @onclick="Edit">Edit</button>
+    <button class="btn btn-danger m-2" @onclick="Delete">Delete</button>
+
+    <hr />
+    <h5>Showing Template: @template.Title</h5>
+    <hr />
+    <div class="row">
+        <div class="col-sm-2">id: @template.Id</div>
+        <div class="col-sm-2">active: @template.IsActive</div>
+        <div class="col-sm-2">in use: @template.IsInUse</div>
+        <div class="col-sm-2">valid from: @template.ValidFrom.ToShortDateString()</div>
+        <div class="col-sm-2">valid to: @template.ValidTo.ToShortDateString()</div>
+    </div>
+    <hr />
+    <div class="row">
+        <div class="col-md-10"><h4>@template.Title</h4></div>
+    </div>
+    <hr />
+    <div class="row">
+        <div class="col-md-10">@template.Content</div>
+    </div>
+    <hr />
+    <p>Template Attributes:</p>
+    @foreach (var item in attributesByTemplateId)
+    {
+        <span>@item.Name</span>
+    }
+    <hr />
+    
+}
+else
+{
+<EditForm Model="@templateSave">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <p>
+        <label for="title" class="col-form-label-lg">Title:</label><br />
+        <InputTextArea class="col-md-10" id="title" @bind-Value="@templateSave.Title" />
+    </p>
+    <p>
+        <label for="content" class="col-form-label-lg">Content:</label><br />
+        <InputTextArea class="col-md-10" id="content" @bind-Value="@templateSave.Content" />
+    </p>
+    <br />
+    <p>
+        <label for="validFrom" class="col-form-label">Valid From:</label>
+        <InputDate id="validFrom" @bind-Value="@templateSave.ValidFrom" />
+    </p>
+    <p>
+        <label class="col-form-label" for="validTo">Valid To:</label>
+        <InputDate id="validTo" @bind-Value="@templateSave.ValidTo" />
+    </p>
+    <p>
+        <label for="inUse" class="form-check-label">Template Is In Use:</label>
+        <EjsCheckBox ID="inUse" @bind-Checked="@templateSave.IsInUse"></EjsCheckBox>
+    </p>
+    <p>
+        <label class="form-check-label" for="isActive">Template Is Active:</label>
+        <EjsCheckBox ID="isActive" @bind-Checked="@templateSave.IsActive"></EjsCheckBox>
+    </p>
+    <hr />
+    <EjsMultiSelect TValue="SaveTemplateAttributeResource" @bind-Value="@attributeSave" DataSource="attributesSaveList">
+        <MultiSelectFieldSettings Value="Name"></MultiSelectFieldSettings>
+    </EjsMultiSelect>
+    <p>TemplateAttributes</p>
+    <EjsChipList EnableDelete="true" EnablePersistence="true">
+        <ChipCollection>
+            @foreach (var attr in attributesByTemplateId)
+            {
+                <ChipListEvents OnDelete="(()=>RemoveAttributeFromTemplate(attr))"></ChipListEvents>
+                <ChipListChip CssClass="e-primary" Text="@attr.Name"></ChipListChip>
+            }
+        </ChipCollection>
+    </EjsChipList>
+    <hr />
+    <p>All available Attributes</p>
+    <EjsChipList>
+        <ChipCollection>
+            @foreach (var attr in allAttributes)
+            {
+                <ChipListEvents OnClick="(()=>MoveAttributeToAttrByTempId(attr))"></ChipListEvents>
+                <ChipListChip Text="@attr.Name"></ChipListChip>
+            }
+        </ChipCollection>
+    </EjsChipList>
+    <hr />
+    <label for="addAttr" class="col-form-label">Add an Attribute:</label>
+    <InputText id="addAttr" @bind-Value="@attributeSave.Name" /><EjsButton CssClass="e-round" IconCss="e-icons e-plus-icon" IsPrimary="true" OnClick="AddAttribute"></EjsButton>
+    <style>
+        .e-plus-icon::before {
+            content: '\e823';
+        }
+    </style>
+    <hr />
+    <button class="btn btn-warning m-4" @onclick="@(()=>EditTemplate(templateSave))">Save Changes</button>
+
+    <button class="btn btn-primary m-4" @onclick="Back">Back</button>
+
+</EditForm>
+}
+
+
+<EjsDialog @ref="ejsDialog" Width="550px" IsModal="true" @bind-Visible="@DialogVisible">
+    <DialogEvents OnOverlayClick="BackToTemplateList">
+    </DialogEvents>
+    <DialogTemplates>
+        <Content><h4> Edit request for template <b> @template.Title </b> was sent.</h4></Content>
+    </DialogTemplates>
+    <DialogButtons><DialogButton ButtonModel="@ContinueButton" OnClick="@BackToTemplateList"></DialogButton></DialogButtons>
+</EjsDialog>
+
+<EjsDialog @ref="DeleteDialog" Width="550px" IsModal="true" @bind-Visible="@DeleteDialogVisible">
+    <DialogEvents OnOverlayClick="CancelDelete">
+    </DialogEvents>
+    <DialogTemplates>
+        <Content><h4> Delete template <b> @template.Title </b> ?</h4></Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton ButtonModel="@CancelDeleteButton" OnClick="@CancelDelete"></DialogButton>
+        <DialogButton ButtonModel="@DeleteButton" OnClick="@DeleteConfirm"></DialogButton>
+    </DialogButtons>
+</EjsDialog>
+
+<EjsDialog @ref="DeleteDialogFinal" Width="550px" IsModal="true" @bind-Visible="@FinalDeleteDialogVisible">
+    <DialogEvents OnOverlayClick="BackToTemplateList">
+    </DialogEvents>
+    <DialogTemplates>
+        <Content><h4> Delete request for template <b> @template.Title </b> was sent.</h4></Content>
+    </DialogTemplates>
+    <DialogButtons><DialogButton ButtonModel="@ContinueButton" OnClick="@BackToTemplateList"></DialogButton></DialogButtons>
+</EjsDialog>
+
+@code {
+        //[Parameter]
+        //public SaveTemplateResource templateSave { get; set; }
+        //[Parameter]
+        //public TemplateResource template { get; set; }
+    public TemplateResource template = new TemplateResource();
+    public SaveTemplateResource templateSave = new SaveTemplateResource();
+    public TemplateAttributeResource attribute = new TemplateAttributeResource();
+    public List<TemplateAttributeResource> allAttributes = new List<TemplateAttributeResource>();
+    public List<TemplateAttributeResource> attributesByTemplateId = new List<TemplateAttributeResource>();
+    public SaveTemplateAttributeResource attributeSave = new SaveTemplateAttributeResource();
+    public SaveTemplateAttributeResource attributeSaveMultiLine = new SaveTemplateAttributeResource();
+    public List<SaveTemplateAttributeResource> attributesSaveListThisTemplate = new List<SaveTemplateAttributeResource>();
+    public List<SaveTemplateAttributeResource> attributesSaveList = new List<SaveTemplateAttributeResource>();
+    public string[] attrNames = new string[] { };
+    [Parameter]
+    public int id { get; set; }
+    public bool DetailsBool { get; set; } = true;
+
+    /// <summary>
+    /// edit and delete dialogs, booleans for their initial visibility and buttons
+    /// </summary>
+    EjsDialog ejsDialog;
+    EjsDialog DeleteDialog;
+    EjsDialog DeleteDialogFinal;
+    private bool DialogVisible = false;
+    private bool DeleteDialogVisible = false;
+    private bool FinalDeleteDialogVisible = false;
+    public Syncfusion.EJ2.Blazor.Buttons.ButtonModel ContinueButton = new Syncfusion.EJ2.Blazor.Buttons.ButtonModel { Content = "Continue", IsPrimary = true };
+    public Syncfusion.EJ2.Blazor.Buttons.ButtonModel CancelDeleteButton = new Syncfusion.EJ2.Blazor.Buttons.ButtonModel { Content = "No, Cancel", IsPrimary = true };
+    public Syncfusion.EJ2.Blazor.Buttons.ButtonModel DeleteButton = new Syncfusion.EJ2.Blazor.Buttons.ButtonModel { Content = "Yes, Delete" };
+
+    /// <summary>
+    /// calling the api method for the template with the id
+    /// </summary>
+    /// <returns>templateresource mapped to the template</returns>
+    protected async override Task OnInitializedAsync()
+    {
+        template = await Http.GetJsonAsync<TemplateResource>($"api/templates/{id}");
+        allAttributes = await Http.GetJsonAsync<List<TemplateAttributeResource>>(@"api/templateattributes");
+        attributesByTemplateId = allAttributes.Where(a => a.TemplateId == template.Id).ToList();
+        AttributesToAttributeSaveList();
+    }
+
+    /// <summary>
+    /// init the edit
+    /// </summary>
+    public void Edit()
+    {
+        templateSave.Title = template.Title;
+        templateSave.Content = template.Content;
+        templateSave.ValidFrom = template.ValidFrom;
+        templateSave.ValidTo = template.ValidTo;
+        templateSave.IsActive = template.IsActive;
+        templateSave.IsInUse = template.IsInUse;
+        DetailsBool = false;
+    }
+
+    public void AttributesToAttributeSaveList()
+    {
+        foreach (var attr in attributesByTemplateId)
+        {
+            //attrNames(attr.Name);
+            //SaveTemplateAttributeResource attrSave = new SaveTemplateAttributeResource { Name = attr.Name, TemplateId = attr.TemplateId };
+            //attributesSaveListThisTemplate.Add(attrSave);
+        }
+        foreach (var attr in allAttributes)
+        {
+            SaveTemplateAttributeResource attrSave = new SaveTemplateAttributeResource { Name = attr.Name, TemplateId = attr.TemplateId };
+            attributesSaveList.Add(attrSave);
+        }
+    }
+    /// <summary>
+    /// adding attribute one by one, without saving changes for entire template, works, has flaws, not good enough solution
+    /// </summary>
+    /// <returns>attribute in the chips. The first attr name is not in the chip list, then all the recently added are shown with the last saved name. on reload they are appearing properly</returns>
+    public async Task AddAttribute()
+    {
+        attributeSave.TemplateId = template.Id;
+        Console.WriteLine(attributeSave.Name);
+        await AddAttributeApiCall();
+        attribute.Name = attributeSave.Name;
+        attributesByTemplateId.Add(attribute);
+        attributeSave.Name = null;
+
+    }
+    public async Task AddAttributeApiCall()
+    {
+        await Http.PostJsonAsync(@"api/templateattributes", attributeSave);
+        Console.WriteLine(attributeSave.Name + " saved");
+    }
+
+    //не функционираат како што треба
+    public void MoveAttributeToAttrByTempId(TemplateAttributeResource templateAttributeResource)
+    {
+        attributesByTemplateId.Add(templateAttributeResource);
+        allAttributes.Remove(templateAttributeResource);
+        StateHasChanged();
+        Console.WriteLine(templateAttributeResource.Name + " moved to this template's attributes");
+    }
+    public void RemoveAttributeFromTemplate(TemplateAttributeResource templateAttributeResource)
+    {
+        attributesByTemplateId.Remove(templateAttributeResource);
+        StateHasChanged();
+        Console.WriteLine(templateAttributeResource.Name + " removed from this template's attributes");
+    }
+
+    /// <summary>
+    /// edit call and info dialog appearing
+    /// </summary>
+    /// <param name="saveTemplate"></param>
+    /// <returns></returns>
+    public async Task EditTemplate(SaveTemplateResource saveTemplate)
+    {
+        await Http.PutJsonAsync($"api/templates/{id}", saveTemplate);
+        this.ejsDialog.Show();
+    }
+
+    /// <summary>
+    /// discard editing and go back to template details
+    /// </summary>
+    public void Back()
+    {
+        DetailsBool = true;
+    }
+
+    //public async Task BackAToThisTemlate()
+    //{
+    //DetailsBool = true;
+    //this.ejsDialog.Hide();
+    //UriHelper.NavigateTo($"/templateedit/{template.Id}");
+    //}
+
+    public void BackToTemplateList()
+    {
+        UriHelper.NavigateTo(@"/templates");
+        //this.ejsDialog.Hide();
+    }
+
+    public void CancelDelete()
+    {
+        this.DeleteDialog.Hide();
+    }
+
+    public void DeleteDialogCall()
+    {
+        this.DeleteDialogFinal.Show();
+    }
+
+    public void Delete()
+    {
+        this.DeleteDialog.Show();
+    }
+
+    public async Task DeleteConfirm()
+    {
+        await Http.DeleteAsync($"api/templates/{template.Id}");
+        //UriHelper.NavigateTo(@"/templates");
+        DeleteDialogCall();
+    }
+    //public void OnContinueBtnClick()
+    //{
+    //  UriHelper.NavigateTo(@"/templates");
+    //}
+
+    //public string Content = "Submit";
+    //private Dictionary<string, object> submit = new Dictionary<string, object>()
+    //{
+    //{ "type", "submit"}
+    //};
+
+
+
+}

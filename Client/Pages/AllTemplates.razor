@@ -1,0 +1,116 @@
+﻿@using BlazorTemplateDoc.Shared.Resources
+@using System.Net.Http
+@page "/templates"
+@inject HttpClient Http
+@inject NavigationManager UriHelper
+
+@*@if (SingleBool == false)
+{*@
+
+    <h3>AllTemplates</h3>
+
+
+    @if (GetAllBool == true && templates == null)
+    {
+        <div class="text-danger">No items found</div>
+    }
+    @if (templates == null/*&& message == true*/)
+    {
+        @*<div class="text-danger">No items found</div>*@
+    }
+    else
+    {
+        <NavLink href="createtemplate">Create New Template</NavLink>
+
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Id</th>@*?*@
+                    <th>Title</th>
+                </tr>
+            </thead>
+            <tbody>
+                @*<ul class="list-group">*@
+                @foreach (var template in templates)
+                {
+                    @*<li class="list-group-item" >
+                            <div class="row">
+                                <p class="col-sm-1 mx-auto">@template.Id</p>
+                                <button @onclick="@(()=> ShowSingle(template))" type="button" class="list-group-item list-group-item-action col-sm-9 offset-1">@template.Title</button>
+                                <button class="btn btn-sm" ></button>
+                            </div>
+                        </li>*@
+
+                    <tr>
+                        <td>@template.Id</td>@*?*@
+                        <td>@template.Title</td>
+
+                        <td>
+                            <button class="btn btn-info" @onclick="@(()=>EditTemplate(template))">Details And Actions</button>
+                        </td>
+                    </tr>
+
+                }
+                @*</ul>*@
+            </tbody>
+        </table>
+    }
+
+@*}*@
+
+@*@if (SingleBool == true)
+{
+    <SimpleTemplate Template="singleTemplate"></SimpleTemplate>
+
+    <button class="btn btn-sm" @onclick="@BackToList">Back to list</button>
+
+}*@
+@*@if (NeverBool == true)
+    {
+         <TemplateEdit></TemplateEdit>
+         <DetailsTemplate></DetailsTemplate>
+    }*@
+@code {
+    //[Parameter]
+    //public bool SingleBool { get; set; } = false;
+    [Parameter]
+    public bool GetAllBool { get; set; } = false;
+    //public bool NeverBool { get; set; } = false;
+    public List<TemplateResource> templates;
+    //[Parameter]
+    //public TemplateResource singleTemplate { get; set; }
+    //[Parameter]
+    //public int Id { get; set; }
+    public SaveTemplateResource saveTemplate = new SaveTemplateResource();
+    protected async override Task OnInitializedAsync()
+    {
+        templates = await Http.GetJsonAsync<List<TemplateResource>>(@"api/templates");
+        GetAllBool = true;
+    }
+
+    //private async Task ShowSingle(TemplateResource template)
+    //{
+    //singleTemplate = template;
+    //SingleBool = true;
+
+    //}
+    //public void BackToList()
+   // {
+        //SingleBool = false;
+   // }
+
+    
+    /// <summary>
+    /// calling the api for a single templateresource, showing template details, options to edit and delete
+    /// </summary>
+    /// <param name="template"></param>
+    public void EditTemplate(TemplateResource template)
+    {
+       
+        UriHelper.NavigateTo($"/templateedit/{Convert.ToInt32(template.Id)}");
+    }
+
+    
+
+}
